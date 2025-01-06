@@ -19,15 +19,10 @@ app.use((req, res, next) => {
   next();
 });
 
-// 确保上传目录存在且有正确的权限
+// 确保上传目录存在
 const uploadsDir = path.join(__dirname, 'uploads');
 if (!fs.existsSync(uploadsDir)) {
-  try {
-    fs.mkdirSync(uploadsDir, { recursive: true, mode: 0o777 });
-    console.log('Upload directory created successfully');
-  } catch (error) {
-    console.error('Error creating upload directory:', error);
-  }
+  fs.mkdirSync(uploadsDir, { recursive: true });
 }
 
 // 检查目录权限
@@ -45,6 +40,13 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 // 静态文件服务
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
+// 在路由处理之前添加日志中间件
+app.use('/api/images', (req, res, next) => {
+  console.log('Request URL:', req.url);
+  console.log('Request Method:', req.method);
+  next();
+});
+
 // API 路由
 app.use('/api/images', imageRoutes);
 
@@ -53,8 +55,8 @@ app.use((err, req, res, next) => {
   console.error('Server error:', err);
   res.status(500).json({ 
     error: '服务器错误',
-    details: err.message,
-    ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
+    details: process.env.NODE_ENV === 'development' ? err.message : undefined,
+    stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
   });
 });
 

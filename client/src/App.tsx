@@ -5,6 +5,7 @@ import Upload from './pages/Upload';
 import Home from './pages/Home';
 import Header from './components/Header';
 import Manage from './pages/Manage';
+import TagManage from './pages/TagManage';
 import './App.css';
 
 const { Content, Footer } = Layout;
@@ -19,6 +20,7 @@ const App: React.FC = () => {
             <Route path="/" element={<Home />} />
             <Route path="/manage" element={<Manage />} />
             <Route path="/upload" element={<Upload />} />
+            <Route path="/tags" element={<TagManage />} />
           </Routes>
         </div>
       </Content>

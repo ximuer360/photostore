@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Row, Col, Card, Empty, Spin, Image as AntImage, Button, message } from 'antd';
+import { Row, Col, Card, Empty, Spin, Image as AntImage, Button, message, Tag } from 'antd';
 import { LinkOutlined, DeleteOutlined } from '@ant-design/icons';
 import { useLocation } from 'react-router-dom';
 import { imageService, UPLOADS_URL } from '../services/api';
@@ -114,8 +114,17 @@ const Home: React.FC = () => {
                 <Meta
                   title={image.title}
                   description={
-                    <div style={{ fontSize: '12px', color: '#999' }}>
-                      {new Date(image.created_at).toLocaleString()}
+                    <div>
+                      <div style={{ fontSize: '12px', color: '#999', marginBottom: '8px' }}>
+                        {new Date(image.created_at).toLocaleString()}
+                      </div>
+                      {image.tags && image.tags.length > 0 && (
+                        <div>
+                          {image.tags.map((tag: string) => (
+                            <Tag key={tag} color="blue">{tag}</Tag>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   }
                 />

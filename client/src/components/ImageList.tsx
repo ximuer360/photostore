@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Table, Button, Space, Modal, message, Switch, Input, Form } from 'antd';
+import { Table, Button, Space, Modal, message, Switch, Input, Form, Select } from 'antd';
 import { EditOutlined, DeleteOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { Image } from '../types';
@@ -9,9 +9,10 @@ interface ImageListProps {
   images: Image[];
   loading: boolean;
   onRefresh: () => void;
+  existingTags: { id: number; name: string }[];
 }
 
-const ImageList: React.FC<ImageListProps> = ({ images, loading, onRefresh }) => {
+const ImageList: React.FC<ImageListProps> = ({ images, loading, onRefresh, existingTags }) => {
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [editingImage, setEditingImage] = useState<Image | null>(null);
   const [form] = Form.useForm();
@@ -166,6 +167,23 @@ const ImageList: React.FC<ImageListProps> = ({ images, loading, onRefresh }) => 
             valuePropName="checked"
           >
             <Switch />
+          </Form.Item>
+          <Form.Item
+            name="tags"
+            label="标签"
+          >
+            <Select
+              mode="tags"
+              style={{ width: '100%' }}
+              placeholder="输入或选择标签"
+              allowClear
+            >
+              {existingTags.map(tag => (
+                <Select.Option key={tag.id} value={tag.name}>
+                  {tag.name}
+                </Select.Option>
+              ))}
+            </Select>
           </Form.Item>
         </Form>
       </Modal>

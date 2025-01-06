@@ -1,38 +1,56 @@
 import React, { useEffect, useState } from 'react';
-import { Table, Button, Space, Modal, message, Switch, Input, Form } from 'antd';
+import { Table, Button, Space, Modal, message, Switch, Input, Form, Select, Tag as AntTag, Spin, Empty } from 'antd';
 import { EditOutlined, DeleteOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
-import { Image } from '../types';
+import type { Image, Tag } from '../types';
 import { imageService, UPLOADS_URL } from '../services/api';
 
 const Manage: React.FC = () => {
   const [images, setImages] = useState<Image[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [editingImage, setEditingImage] = useState<Image | null>(null);
   const [form] = Form.useForm();
+  const [tags, setTags] = useState<Tag[]>([]);
 
-  const fetchImages = async () => {
+  const loadData = async () => {
+    if (loading) return; // 防止重复加载
+    
+    setLoading(true);
     try {
-      setLoading(true);
-      const data = await imageService.getAll();
-      setImages(data);
+      console.log('Loading data...');
+      
+      // 获取图片列表
+      const imagesData = await imageService.getAll();
+      console.log('Loaded images:', imagesData);
+      
+      // 获取标签列表
+      const tagsData = await imageService.getAllTags();
+      console.log('Loaded tags:', tagsData);
+
+      // 只有当两个请求都成功时才更新状态
+      setImages(imagesData);
+      setTags(tagsData);
+
     } catch (error) {
-      message.error('获取图片列表失败');
+      // 不显示错误提示，只记录日志
+      console.error('Data loading error:', error);
     } finally {
       setLoading(false);
     }
   };
 
+  // 修改初始化逻辑
   useEffect(() => {
-    fetchImages();
-  }, []);
+    loadData();
+  }, []); // 移除错误处理，简化逻辑
 
   const handleEdit = (record: Image) => {
     setEditingImage(record);
     form.setFieldsValue({
       title: record.title,
       is_public: record.is_public,
+      tags: record.tags || []
     });
     setEditModalVisible(true);
   };
@@ -48,7 +66,7 @@ const Manage: React.FC = () => {
         try {
           await imageService.delete(record.id);
           message.success('删除成功');
-          fetchImages();
+          loadData();
         } catch (error) {
           message.error('删除失败');
         }
@@ -60,17 +78,17 @@ const Manage: React.FC = () => {
     try {
       const values = await form.validateFields();
       if (editingImage) {
-        await imageService.update(editingImage.id, values);
+        await imageService.update(editingImage.id, {
+          title: values.title,
+          is_public: values.is_public,
+          tags: values.tags
+        });
         message.success('更新成功');
         setEditModalVisible(false);
-        fetchImages();  // 重新加载数据
+        loadData();
       }
     } catch (error) {
-      if (error instanceof Error) {
-        message.error(`更新失败: ${error.message}`);
-      } else {
-        message.error('更新失败');
-      }
+      message.error('更新失败');
     }
   };
 
@@ -118,6 +136,17 @@ const Manage: React.FC = () => {
       render: (date: string) => new Date(date).toLocaleString(),
     },
     {
+      title: '标签',
+      key: 'tags',
+      render: (_, record) => (
+        <span>
+          {record.tags && record.tags.map(tag => (
+            <AntTag key={tag} color="blue">{tag}</AntTag>
+          ))}
+        </span>
+      ),
+    },
+    {
       title: '操作',
       key: 'action',
       width: 150,
@@ -145,17 +174,33 @@ const Manage: React.FC = () => {
 
   return (
     <div className="manage-container">
-      <Table
-        columns={columns}
-        dataSource={images}
-        loading={loading}
-        rowKey="id"
-        pagination={{
-          defaultPageSize: 10,
-          showSizeChanger: true,
-          showTotal: (total) => `共 ${total} 条`,
-        }}
-      />
+      {loading ? (
+        <div style={{ textAlign: 'center', padding: '50px' }}>
+          <Spin size="large" />
+        </div>
+      ) : images.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '50px' }}>
+          <Empty description="暂无图片" />
+          <Button 
+            type="primary" 
+            onClick={loadData} 
+            style={{ marginTop: '16px' }}
+          >
+            重新加载
+          </Button>
+        </div>
+      ) : (
+        <Table
+          columns={columns}
+          dataSource={images}
+          rowKey="id"
+          pagination={{
+            defaultPageSize: 10,
+            showSizeChanger: true,
+            showTotal: (total) => `共 ${total} 条`,
+          }}
+        />
+      )}
 
       <Modal
         title="编辑图片信息"
@@ -175,6 +220,23 @@ const Manage: React.FC = () => {
             rules={[{ required: true, message: '请输入标题' }]}
           >
             <Input />
+          </Form.Item>
+          <Form.Item
+            name="tags"
+            label="标签"
+          >
+            <Select
+              mode="tags"
+              style={{ width: '100%' }}
+              placeholder="选择或输入标签"
+              allowClear
+            >
+              {tags.map(tag => (
+                <Select.Option key={tag.id} value={tag.name}>
+                  {tag.name}
+                </Select.Option>
+              ))}
+            </Select>
           </Form.Item>
           <Form.Item
             name="is_public"

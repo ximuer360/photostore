@@ -2,43 +2,71 @@ const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 const fs = require('fs');
 
-// 确保数据库目录存在
-const dbDir = path.resolve(__dirname, '..');
+// 数据库文件路径
+const dbPath = path.join(__dirname, '../data/photostore.db');
+
+// 确保数据目录存在
+const dbDir = path.dirname(dbPath);
 if (!fs.existsSync(dbDir)) {
   fs.mkdirSync(dbDir, { recursive: true });
 }
 
-const dbPath = path.join(dbDir, 'photostore.db');
-console.log('Database path:', dbPath);
+// 初始化数据库表
+function initDatabase(db) {
+  return new Promise((resolve, reject) => {
+    console.log('Initializing database...');
+    const initSql = fs.readFileSync(path.join(__dirname, 'init.sql'), 'utf8');
+    const statements = initSql.split(';').filter(stmt => stmt.trim());
 
-const db = new sqlite3.Database(dbPath, (err) => {
-  if (err) {
-    console.error('Error connecting to database:', err);
-  } else {
-    console.log('Connected to SQLite database');
-    initDatabase();
-  }
-});
+    db.serialize(() => {
+      db.run('BEGIN TRANSACTION');
 
-const initDatabase = () => {
-  db.serialize(() => {
-    // 创建图片表
-    db.run(`
-      CREATE TABLE IF NOT EXISTS images (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        title TEXT,
-        filename TEXT NOT NULL,
-        filepath TEXT NOT NULL,
-        mimetype TEXT NOT NULL,
-        size INTEGER NOT NULL,
-        is_public BOOLEAN DEFAULT false,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-      )
-    `, (err) => {
-      if (err) console.error('Error creating images table:', err);
-      else console.log('Images table ready');
+      for (const statement of statements) {
+        if (statement.trim()) {
+          db.run(statement, (err) => {
+            if (err) {
+              console.error('Error executing statement:', err);
+              console.error('Statement:', statement);
+              reject(err);
+            }
+          });
+        }
+      }
+
+      db.run('COMMIT', (err) => {
+        if (err) {
+          console.error('Error committing transaction:', err);
+          reject(err);
+        } else {
+          console.log('Database tables initialized successfully');
+          resolve();
+        }
+      });
     });
   });
-};
+}
+
+// 创建数据库连接
+const db = new sqlite3.Database(dbPath, (err) => {
+  if (err) {
+    console.error('Database connection error:', err);
+    throw err;
+  }
+  console.log('Connected to database at:', dbPath);
+  
+  // 验证数据库表
+  db.all("SELECT name FROM sqlite_master WHERE type='table'", [], (err, tables) => {
+    if (err) {
+      console.error('Error checking tables:', err);
+    } else {
+      console.log('Available tables:', tables);
+    }
+  });
+});
+
+// 添加错误处理
+db.on('error', (err) => {
+  console.error('Database error:', err);
+});
 
 module.exports = db; 

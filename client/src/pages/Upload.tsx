@@ -1,90 +1,143 @@
-import React from 'react';
-import { Form, Input, Button, Card, message, Switch } from 'antd';
+import React, { useState, useEffect } from 'react';
+import { Upload as AntUpload, Form, Input, Switch, Button, message, Select } from 'antd';
+import { UploadOutlined } from '@ant-design/icons';
 import type { UploadFile } from 'antd/es/upload/interface';
+import type { Tag } from '../types';
 import { imageService } from '../services/api';
-import ImageUploader from '../components/ImageUploader';
 
-const UploadPage: React.FC = () => {
+const Upload: React.FC = () => {
   const [form] = Form.useForm();
-  const [fileList, setFileList] = React.useState<UploadFile[]>([]);
-  const [uploading, setUploading] = React.useState(false);
+  const [fileList, setFileList] = useState<UploadFile[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const [availableTags, setAvailableTags] = useState<Tag[]>([]);
 
-  const handleUpload = async (values: { title: string; is_public: boolean }) => {
-    if (fileList.length === 0) {
-      message.error('请选择要上传的图片');
-      return;
-    }
-
-    setUploading(true);
-    try {
-      for (const file of fileList) {
-        const result = await imageService.upload(file.originFileObj as File, {
-          title: `${values.title}_${file.name}`,
-          is_public: values.is_public
-        });
-
-        if (!result.success) {
-          throw new Error(result.error);
+  // 加载可用标签
+  useEffect(() => {
+    const loadAvailableTags = async () => {
+      try {
+        console.log('Loading available tags...');
+        const tagList = await imageService.getAllTags();
+        console.log('Available tags:', tagList);
+        if (Array.isArray(tagList)) {
+          setAvailableTags(tagList);
         }
+      } catch (error) {
+        console.error('Failed to load tags:', error);
+      }
+    };
+
+    loadAvailableTags();
+  }, []);
+
+  const handleUpload = async () => {
+    try {
+      const values = await form.validateFields();
+      if (!fileList[0]?.originFileObj) {
+        message.error('请选择要上传的图片');
+        return;
       }
 
-      message.success('上传成功');
-      setFileList([]);
-      form.resetFields();
+      setUploading(true);
+
+      const result = await imageService.upload(fileList[0].originFileObj, {
+        title: values.title,
+        is_public: values.is_public,
+        tags: values.tags || []
+      });
+
+      if (result.success) {
+        message.success('上传成功');
+        setFileList([]);
+        form.resetFields();
+      } else {
+        message.error(result.error || '上传失败');
+      }
     } catch (error) {
-      message.error(error instanceof Error ? error.message : '上传失败');
+      console.error('Upload error:', error);
+      message.error('上传失败');
     } finally {
       setUploading(false);
     }
   };
 
+  const beforeUpload = (file: File) => {
+    const isImage = file.type.startsWith('image/');
+    if (!isImage) {
+      message.error('只能上传图片文件！');
+      return false;
+    }
+    const isLt5M = file.size / 1024 / 1024 < 5;
+    if (!isLt5M) {
+      message.error('图片大小不能超过 5MB！');
+      return false;
+    }
+    setFileList([{ uid: '-1', name: file.name, originFileObj: file } as UploadFile]);
+    return false;
+  };
+
   return (
-    <div style={{ maxWidth: 800, margin: '0 auto', padding: '20px' }}>
-      <Card title="上传图片">
-        <Form
-          form={form}
-          layout="vertical"
-          onFinish={handleUpload}
-          initialValues={{ is_public: false }}
+    <div style={{ maxWidth: 600, margin: '0 auto', padding: '20px' }}>
+      <Form form={form} layout="vertical">
+        <Form.Item
+          name="title"
+          label="标题"
+          rules={[{ required: true, message: '请输入标题' }]}
         >
-          <Form.Item
-            label="标题"
-            name="title"
-            rules={[{ required: true, message: '请输入图片标题' }]}
+          <Input placeholder="请输入图片标题" />
+        </Form.Item>
+
+        <Form.Item
+          name="tags"
+          label="标签"
+        >
+          <Select
+            mode="tags"
+            style={{ width: '100%' }}
+            placeholder="选择或输入标签"
+            allowClear
+            options={availableTags.map(tag => ({
+              label: `${tag.name} (${tag.usage_count})`,
+              value: tag.name
+            }))}
+          />
+        </Form.Item>
+
+        <Form.Item
+          name="is_public"
+          label="是否公开"
+          valuePropName="checked"
+          initialValue={true}
+        >
+          <Switch />
+        </Form.Item>
+
+        <Form.Item label="图片">
+          <AntUpload
+            listType="picture"
+            fileList={fileList}
+            beforeUpload={beforeUpload}
+            onRemove={() => {
+              setFileList([]);
+              return true;
+            }}
           >
-            <Input placeholder="请输入图片标题（多张图片会自动添加序号）" />
-          </Form.Item>
+            <Button icon={<UploadOutlined />}>选择图片</Button>
+          </AntUpload>
+        </Form.Item>
 
-          <Form.Item
-            label="是否公开"
-            name="is_public"
-            valuePropName="checked"
+        <Form.Item>
+          <Button
+            type="primary"
+            onClick={handleUpload}
+            loading={uploading}
+            style={{ width: '100%' }}
           >
-            <Switch checkedChildren="公开" unCheckedChildren="私密" />
-          </Form.Item>
-
-          <Form.Item label="图片">
-            <ImageUploader
-              fileList={fileList}
-              onFileListChange={setFileList}
-            />
-          </Form.Item>
-
-          <Form.Item>
-            <Button
-              type="primary"
-              htmlType="submit"
-              loading={uploading}
-              disabled={fileList.length === 0}
-              block
-            >
-              {uploading ? '上传中...' : '开始上传'}
-            </Button>
-          </Form.Item>
-        </Form>
-      </Card>
+            {uploading ? '上传中...' : '开始上传'}
+          </Button>
+        </Form.Item>
+      </Form>
     </div>
   );
 };
 
-export default UploadPage; 
+export default Upload; 
