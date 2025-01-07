@@ -143,7 +143,7 @@ photostore/
 ### 安装步骤
 
 1. 克隆项目
-bash
+```bash
 git clone https://github.com/yourusername/photostore.git
 cd photostore
 ```
